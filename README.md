@@ -1,2 +1,12 @@
 # fault-tolerance-hw3
-Fault tolerence HW3
+## How to Run?
+
+### Server
+```bash
+python3 -m dispatcher
+```
+
+### Voter
+```bash
+python3 -m voter
+```

@@ -127,3 +127,11 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# VS Code folder config
+.vscode/
+
+# keys
+*_key
+voters.json
+.DS_Store
