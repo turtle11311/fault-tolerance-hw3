@@ -1,0 +1,1 @@
+[{"name": "Election1", "groups": ["student", "teacher"], "choices": ["number1", "number2"], "end_date": "2023-01-01T00:00:00Z"}, {"name": "Election2", "groups": ["teacher"], "choices": ["number1", "number2"], "end_date": "2022-01-01T00:00:00Z"}]
