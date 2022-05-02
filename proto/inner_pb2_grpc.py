@@ -2,7 +2,8 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from innerProto import inner_pb2 as inner__pb2
+import proto.inner_pb2 as inner__pb2
+import proto.voting_pb2 as voting__pb2
 
 
 class eVotingReplicaStub(object):
@@ -15,24 +16,24 @@ class eVotingReplicaStub(object):
             channel: A grpc.Channel.
         """
         self.CreateElection = channel.unary_unary(
-                '/voting.eVotingReplica/CreateElection',
-                request_serializer=inner__pb2.Election.SerializeToString,
-                response_deserializer=inner__pb2.Status.FromString,
+                '/voting.inner.eVotingReplica/CreateElection',
+                request_serializer=voting__pb2.Election.SerializeToString,
+                response_deserializer=voting__pb2.Status.FromString,
                 )
         self.CastVote = channel.unary_unary(
-                '/voting.eVotingReplica/CastVote',
+                '/voting.inner.eVotingReplica/CastVote',
                 request_serializer=inner__pb2.Vote.SerializeToString,
-                response_deserializer=inner__pb2.Status.FromString,
+                response_deserializer=voting__pb2.Status.FromString,
                 )
         self.GetResult = channel.unary_unary(
-                '/voting.eVotingReplica/GetResult',
-                request_serializer=inner__pb2.ElectionName.SerializeToString,
-                response_deserializer=inner__pb2.ElectionResult.FromString,
+                '/voting.inner.eVotingReplica/GetResult',
+                request_serializer=voting__pb2.ElectionName.SerializeToString,
+                response_deserializer=voting__pb2.ElectionResult.FromString,
                 )
         self.ElectionRecovery = channel.unary_unary(
-                '/voting.eVotingReplica/ElectionRecovery',
-                request_serializer=inner__pb2.Elections.SerializeToString,
-                response_deserializer=inner__pb2.Status.FromString,
+                '/voting.inner.eVotingReplica/ElectionRecovery',
+                request_serializer=inner__pb2.ElectionRecoveryRequest.SerializeToString,
+                response_deserializer=inner__pb2.Elections.FromString,
                 )
 
 
@@ -68,27 +69,27 @@ def add_eVotingReplicaServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CreateElection': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateElection,
-                    request_deserializer=inner__pb2.Election.FromString,
-                    response_serializer=inner__pb2.Status.SerializeToString,
+                    request_deserializer=voting__pb2.Election.FromString,
+                    response_serializer=voting__pb2.Status.SerializeToString,
             ),
             'CastVote': grpc.unary_unary_rpc_method_handler(
                     servicer.CastVote,
                     request_deserializer=inner__pb2.Vote.FromString,
-                    response_serializer=inner__pb2.Status.SerializeToString,
+                    response_serializer=voting__pb2.Status.SerializeToString,
             ),
             'GetResult': grpc.unary_unary_rpc_method_handler(
                     servicer.GetResult,
-                    request_deserializer=inner__pb2.ElectionName.FromString,
-                    response_serializer=inner__pb2.ElectionResult.SerializeToString,
+                    request_deserializer=voting__pb2.ElectionName.FromString,
+                    response_serializer=voting__pb2.ElectionResult.SerializeToString,
             ),
             'ElectionRecovery': grpc.unary_unary_rpc_method_handler(
                     servicer.ElectionRecovery,
-                    request_deserializer=inner__pb2.Elections.FromString,
-                    response_serializer=inner__pb2.Status.SerializeToString,
+                    request_deserializer=inner__pb2.ElectionRecoveryRequest.FromString,
+                    response_serializer=inner__pb2.Elections.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'voting.eVotingReplica', rpc_method_handlers)
+            'voting.inner.eVotingReplica', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
@@ -107,9 +108,9 @@ class eVotingReplica(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/voting.eVotingReplica/CreateElection',
-            inner__pb2.Election.SerializeToString,
-            inner__pb2.Status.FromString,
+        return grpc.experimental.unary_unary(request, target, '/voting.inner.eVotingReplica/CreateElection',
+            voting__pb2.Election.SerializeToString,
+            voting__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -124,9 +125,9 @@ class eVotingReplica(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/voting.eVotingReplica/CastVote',
+        return grpc.experimental.unary_unary(request, target, '/voting.inner.eVotingReplica/CastVote',
             inner__pb2.Vote.SerializeToString,
-            inner__pb2.Status.FromString,
+            voting__pb2.Status.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -141,9 +142,9 @@ class eVotingReplica(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/voting.eVotingReplica/GetResult',
-            inner__pb2.ElectionName.SerializeToString,
-            inner__pb2.ElectionResult.FromString,
+        return grpc.experimental.unary_unary(request, target, '/voting.inner.eVotingReplica/GetResult',
+            voting__pb2.ElectionName.SerializeToString,
+            voting__pb2.ElectionResult.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -158,8 +159,8 @@ class eVotingReplica(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/voting.eVotingReplica/ElectionRecovery',
-            inner__pb2.Elections.SerializeToString,
-            inner__pb2.Status.FromString,
+        return grpc.experimental.unary_unary(request, target, '/voting.inner.eVotingReplica/ElectionRecovery',
+            inner__pb2.ElectionRecoveryRequest.SerializeToString,
+            inner__pb2.Elections.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

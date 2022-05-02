@@ -1,0 +1,42 @@
+syntax = "proto2";
+
+package voting.inner;
+
+import "google/protobuf/timestamp.proto";
+import "voting.proto";
+
+service eVotingReplica {
+    rpc CreateElection (voting.Election) returns (voting.Status);
+    rpc CastVote (Vote) returns (voting.Status);
+    rpc GetResult(voting.ElectionName) returns (voting.ElectionResult);
+    rpc ElectionRecovery(ElectionRecoveryRequest) returns (Elections);
+}
+
+message ElectionRecoveryRequest {}
+
+message Voter {
+    required string name = 1;
+    required string group = 2;
+}
+
+message Vote {
+    required string election_name = 1;
+    required string choice_name = 2;
+    required Voter voter = 3;
+}
+
+message ElectionResult {
+    required int32 status = 1;
+    repeated voting.VoteCount count = 2; 
+}
+message ElectionStatus {
+    required string name = 1;
+    repeated string groups = 2;
+    repeated string choices = 3;
+    repeated voting.VoteCount count = 4;
+    repeated string voters = 5;
+    required google.protobuf.Timestamp end_date = 6;
+}
+message Elections {
+    repeated ElectionStatus elections = 1;
+}

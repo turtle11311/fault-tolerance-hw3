@@ -135,3 +135,7 @@ dmypy.json
 *_key
 voters.json
 .DS_Store
+
+# result
+election.json
+result.json

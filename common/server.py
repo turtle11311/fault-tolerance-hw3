@@ -1,24 +1,18 @@
 from __future__ import annotations
 from array import array
-import base64
 from concurrent import futures
-from csv import excel_tab
-import imp
 import logging
 import json
 import time
 import jsonschema
-from random import Random
-from typing import Dict, Tuple, List
+from typing import Dict, List
 import time
 from google.protobuf.timestamp_pb2 import Timestamp
 
-from nacl.signing import VerifyKey
-from nacl.exceptions import ValueError, BadSignatureError
 import grpc
-from innerProto import inner_pb2_grpc
-from innerProto import inner_pb2
-
+from proto import inner_pb2_grpc
+from proto import inner_pb2
+from proto import voting_pb2
 
 class ElectionSpecError(Exception):
     def __init__(self, election_name: str) -> None:
@@ -58,18 +52,9 @@ class HasBeenVotedError(Exception):
         return "Voter[{}] is casted before in election {}".format(self.voter_name, self.election_name)
 
 class Voter():
-    def __init__(self, name: str, group: str, pub_key: bytes) -> None:
+    def __init__(self, name: str, group: str) -> None:
         self.name = name
         self.group = group
-        self.pub_key = pub_key
-        
-    class JSONEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, Voter):
-                return {'name': obj.name, 'group': obj.group, 'public_key': base64.b64encode(obj.pub_key).decode('utf-8')}
-            # Let the base class default method raise the TypeError
-            return json.JSONEncoder.default(self, obj)
-    
 
 class Election():
     def __init__(self, name: str, groups: array, choices: array, end_date: str) -> None:
@@ -86,9 +71,9 @@ class Election():
             return json.JSONEncoder.default(self, obj)
 
 class ElectDataLoader():
-    def __init__(self, db_loc: str):
-        self.db_loc = db_loc
-        self.Result_loc = 'primary/electionResult.json'
+    def __init__(self, election_loc: str = './election.json', result_loc: str = './result.json'):
+        self.election_loc = election_loc
+        self.result_loc = result_loc
         self.elections: Dict[str, Election] = dict()
         self.schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -118,7 +103,7 @@ class ElectDataLoader():
             }
         }
         try:
-            with open(self.db_loc, 'r') as elect_dbs:
+            with open(self.election_loc, 'r') as elect_dbs:
                 elect_collections = json.load(elect_dbs)
                 jsonschema.validate( elect_collections, schema=self.schema)
                 for elect_data in elect_collections:
@@ -128,23 +113,23 @@ class ElectDataLoader():
                     end_date = elect_data['end_date']
                     self.elections[name] = Election(name=name, groups=groups, choices=choices ,end_date=end_date)
         except FileNotFoundError:
-            with open(self.db_loc, 'w') as elect_dbs:
+            with open(self.election_loc, 'w') as elect_dbs:
                 json.dump([], elect_dbs)
                 elect_dbs.close()
-                logging.warning('{} not exist, create it'.format(self.db_loc))
-            with open(self.Result_loc, 'w') as electResult_dbs:
+                logging.warning('{} not exist, create it'.format(self.election_loc))
+            with open(self.result_loc, 'w') as electResult_dbs:
                 json.dump([], electResult_dbs)
                 electResult_dbs.close()
-                logging.warning('{} not exist, create it'.format(self.Result_loc))
+                logging.warning('{} not exist, create it'.format(self.result_loc))
         except jsonschema.ValidationError as e:
             logging.error('db file is corrupted: {}'.format(e))
             exit(1)
 
     def CreateResultList(self, name: str, choices: array):
-        with open(self.Result_loc, 'r') as electResult_dbs:
+        with open(self.result_loc, 'r') as electResult_dbs:
             data = json.load(electResult_dbs)
             electResult_dbs.close()
-        with open(self.Result_loc, 'w') as electResult_dbs:
+        with open(self.result_loc, 'w') as electResult_dbs:
             dict_choices = dict.fromkeys(choices,0) # list convert to dict
             data.append({ \
                 'name': name, \
@@ -162,7 +147,7 @@ class ElectDataLoader():
         if not len(groups) or not len(choices):
             raise ElectionSpecError(name)
         self.elections[name] = Election(name=name, groups=list(groups), choices=list(choices) ,end_date=str(end_date.ToJsonString()))
-        with open(self.db_loc, 'w') as elect_dbs:
+        with open(self.election_loc, 'w') as elect_dbs:
             json.dump(list(map(lambda v: v[1],self.elections.items())),fp=elect_dbs,cls=Election.JSONEncoder)
             elect_dbs.close()
         self.CreateResultList(name=name, choices=list(choices))
@@ -172,18 +157,15 @@ class ElectDataLoader():
             election = self.elections[election_name]
         except KeyError:
             raise InvalidElecitonNameError(election_name)
-    
         if voter.group not in election.groups:
             raise VoterGroupError(election_name, voter)
         election_index = list(self.elections).index(election_name)
-        with open(self.Result_loc, 'r') as electResult_dbs:
+        with open(self.result_loc, 'r') as electResult_dbs:
             data = json.load(electResult_dbs)
             electResult_dbs.close()
-        
-        
         if voter.name in data[election_index]['voters']:
             raise HasBeenVotedError(election_name, voter.name)
-        with open(self.Result_loc, 'w') as electResult_dbs:
+        with open(self.result_loc, 'w') as electResult_dbs:
             data[election_index]['choices'][choice_name]+=1
             data[election_index]['voters'].append(voter.name)
             json.dump(data, fp=electResult_dbs)
@@ -199,27 +181,68 @@ class ElectDataLoader():
         if int(elecTime.seconds) > int(CurrentTime): 
             # The election is still ongoing. Election result is not available yet.
             return 1,[]
-        with open(self.Result_loc, 'r') as electResult_dbs:
+        with open(self.result_loc, 'r') as electResult_dbs:
             data = json.load(electResult_dbs)
             electResult_dbs.close()
-        
         return data[election_index]['choices']
 
+    def retrieveData(self):
+        with open(self.result_loc, 'r') as electResult_dbs:
+            ResultData = json.load(electResult_dbs)
+            electResult_dbs.close()
+        with open(self.election_loc, 'r') as elect_dbs:
+            ElectionData = json.load(elect_dbs)
+            elect_dbs.close()
+        return ResultData, ElectionData
+    
+    def recoverData(self, rsp: inner_pb2.Elections):
+        ElectionData = []
+        ResultData = []
+        for election in rsp.elections:
+            ElectionData.append({
+                "name": election.name,
+                "groups": list(election.groups),
+                "choices": list(election.choices),
+                "end_date": str(election.end_date.ToJsonString())
+            })
+            choices = dict()
+            for count in election.count:
+                choices[count.choice_name] = count.count
+            ResultData.append({
+                "name": election.name,
+                "choices": choices,
+                "voters": list(election.voters)
+            })
+        with open(self.result_loc, 'w') as electResult_dbs:
+            json.dump(obj=ResultData, fp=electResult_dbs)
+            electResult_dbs.close()
+        with open(self.election_loc, 'w') as elect_dbs:
+            json.dump(obj=ElectionData, fp=elect_dbs)
+            elect_dbs.close()
+        
+
 class eVotingServer(inner_pb2_grpc.eVotingReplicaServicer):
-    def __init__(self) -> None:
-        self.electDB = ElectDataLoader('primary/elections.json')
-        self.Election_loc = 'primary/elections.json'
-        self.Result_loc = 'primary/electionResult.json'
+    def __init__(self, addr: str, election_loc: str, result_loc: str, replicas: List[str] = []) -> None:
+        self.electDB = ElectDataLoader(election_loc, result_loc)
+        self.srv_addr = addr
+        if replicas != []:
+            for replica_addr in replicas:
+                self.recoverFromReplica(replica_addr)
+                
+    def recoverFromReplica(self, replica_addr: str):
+        try:
+            with grpc.insecure_channel(replica_addr) as channel:
+                recovery_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
+                rsp = recovery_stub.ElectionRecovery(inner_pb2.ElectionRecoveryRequest())
+                self.electDB.recoverData(rsp)
+        except grpc.RpcError as e:
+            pass
 
     def CreateElection(self, request, context):
         status = 0
+        logging.info("Create election [{}]".format(request.name))
         try:
-            token = request.token.value
-            self.authenticator.verify_token(token)
             self.electDB.CreateElect(request.name, request.groups, request.choices, request.end_date)
-        except TokenInvalidError as e:
-            logging.warning(e)
-            status = 1
         except ElectionSpecError as e:
             logging.warning(e)
             status = 2
@@ -228,18 +251,14 @@ class eVotingServer(inner_pb2_grpc.eVotingReplicaServicer):
             # Unknown error
             status = 3
         finally:
-            return inner_pb2.Status(code=status)
+            return voting_pb2.Status(code=status)
 
     def CastVote(self, request, context):
+        logging.info("Voter[{}] cast election [{}]".format(request.voter.name, request.election_name))
         status = 0
         try:
-            token = request.token.value
-            voter = self.authenticator.verify_token(token)
-            self.electDB.UpdateResultList(voter, request.election_name, request.choice_name)
-            #return voting_pb2.Status(code=0)
-        except TokenInvalidError as e:
-            logging.warning(e)
-            status = 1
+            self.electDB.UpdateResultList(Voter(request.voter.name, request.voter.group), request.election_name, request.choice_name)
+            return voting_pb2.Status(code=0)
         except InvalidElecitonNameError as e:
             logging.warning(e)
             status = 2
@@ -254,9 +273,10 @@ class eVotingServer(inner_pb2_grpc.eVotingReplicaServicer):
             # Unknown error
             status = 5
         finally:
-            return inner_pb2.Status(code=status)
+            return voting_pb2.Status(code=status)
 
     def GetResult(self,request, context):
+        logging.info("get result")
         status = 0
         try:
             GetResult_dic = self.electDB.GetResultList(request.name)
@@ -272,45 +292,39 @@ class eVotingServer(inner_pb2_grpc.eVotingReplicaServicer):
             return inner_pb2.ElectionResult( \
                 status = status, \
                 count = count)
-
-    def ElectionRecovery(self, request, context):   
+    def ElectionRecovery(self, request, context):
+        logging.info("primary recovery election data")
         try:
-            elections = request.elections
-            ResultData = []  
-            ElectionData = []       
-            for i in range(len(elections)):   
-                choices = {}
-                for k in elections[i].count:
-                    choices[k.choice_name] = k.count
-                ResultData.append({ 
-                'name': elections[i].name, 
-                'choices': choices,
-                'voters' : list(elections[i].voters)})
-                ElectionData.append({ 
-                'name': elections[i].name, 
-                'groups': list(elections[i].groups),
-                'choices': list(elections[i].choices),
-                'end_date' : elections[i].end_date.ToJsonString()})
-
-            with open(self.Result_loc, 'w') as electResult_dbs:
-                json.dump(ResultData, fp=electResult_dbs)
-                electResult_dbs.close()
-            with open(self.Election_loc, 'w') as elect_dbs:
-                json.dump(ElectionData, fp=elect_dbs)
-                elect_dbs.close()
+            ResultData, ElectionData = self.electDB.retrieveData()
+            election = []
+            for i in range(len(ResultData)):
+                count = []
+                end_time = Timestamp()
+                end_time.FromJsonString(ElectionData[i]['end_date'])
+                choice_list = ResultData[i]['choices']
+                for key in choice_list:
+                    count.append(voting_pb2.VoteCount(choice_name=key, count=choice_list[key]))
+                
+                election.append(inner_pb2.ElectionStatus(
+                    name = ResultData[i]['name'],
+                    groups = ElectionData[i]['groups'],
+                    choices = ElectionData[i]['choices'],
+                    count = count,
+                    voters = ResultData[i]['voters'],
+                    end_date = end_time
+                ))
+        except grpc.RpcError as e:
+            logging.error(e)
         except Exception as e:
-            logging.warning(e)
-            return inner_pb2.Status(code = 0)
+            logging.error(e)
         finally:
-            return inner_pb2.Status(code = 1)
-    
+            return inner_pb2.Elections(elections = election)
     def serve(self):
         try:
             self._grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
             inner_pb2_grpc.add_eVotingReplicaServicer_to_server(self, self._grpc_server)
-            self._grpc_server.add_insecure_port('[::]:50051')
+            self._grpc_server.add_insecure_port(self.srv_addr)
             self._grpc_server.start()
             self._grpc_server.wait_for_termination()
         except KeyboardInterrupt:
             pass
-

@@ -4,12 +4,11 @@ from os import path
 from google.protobuf.timestamp_pb2 import Timestamp
 from nacl.public import PrivateKey
 from nacl.signing import SigningKey, VerifyKey
-from nacl.encoding import Base64Encoder
 from google.protobuf.timestamp_pb2 import Timestamp
 import logging
 import grpc
-from innerProto import inner_pb2
-from innerProto import inner_pb2_grpc
+from proto.voting_pb2 import Election, Vote, ElectionName
+from proto.inner_pb2_grpc import eVotingReplicaStub
 
 voter_name = 'Hello'
 
@@ -61,10 +60,10 @@ def run():
 
         try:
             print('\n【Test "CreateElection" function】')
-            Election_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
+            Election_stub = eVotingReplicaStub(channel)
             end_time = Timestamp()
             end_time.FromJsonString('2023-01-01T00:00:00Z')
-            election_status = Election_stub.CreateElection(inner_pb2.Election(
+            election_status = Election_stub.CreateElection(Election(
                 name='Election1',
                 groups=['student','teacher'],
                 choices=['number1','number2'],
@@ -73,7 +72,7 @@ def run():
 
             end_time = Timestamp()
             end_time.FromJsonString('2022-01-01T00:00:00Z')
-            election_status = Election_stub.CreateElection(inner_pb2.Election(
+            election_status = Election_stub.CreateElection(Election(
                 name='Election2',
                 groups=['teacher'],
                 choices=['number1','number2'],
@@ -83,7 +82,7 @@ def run():
                 print('-> Test "Election create" success!')
                 logging.info('Election created successfully')
 
-            election_status = Election_stub.CreateElection(inner_pb2.Election(
+            election_status = Election_stub.CreateElection(Election(
                 name='Election2',
                 groups=['teacher'],
                 choices=['number1','number2'],
@@ -93,7 +92,7 @@ def run():
                 print('-> Test "Invalid authentication token" success!')
                 logging.info('Invalid authentication token')
 
-            election_status = Election_stub.CreateElection(inner_pb2.Election(
+            election_status = Election_stub.CreateElection(Election(
                 name='Election1',
                 groups=[],
                 choices=[],
@@ -109,8 +108,8 @@ def run():
 
         try:
             print('\n【Test "CastVote" function】')
-            CastVote_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
-            castVote_status = CastVote_stub.CastVote(inner_pb2.Vote(
+            CastVote_stub = eVotingReplicaStub(channel)
+            castVote_status = CastVote_stub.CastVote(Vote(
                 election_name='Election1',
                 choice_name ='number1',
                 ))
@@ -118,8 +117,8 @@ def run():
                 print('-> Test "successful vote" success!')
                 logging.info('Successful vote')
 
-            CastVote_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
-            castVote_status = CastVote_stub.CastVote(inner_pb2.Vote(
+            CastVote_stub = eVotingReplicaStub(channel)
+            castVote_status = CastVote_stub.CastVote(Vote(
                 election_name='Election1000',
                 choice_name ='number1',
                 ))
@@ -127,8 +126,8 @@ def run():
                 print('-> Test "Invalid election name" success!')
                 logging.warning('Invalid election name')
             
-            CastVote_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
-            castVote_status = CastVote_stub.CastVote(inner_pb2.Vote(
+            CastVote_stub = eVotingReplicaStub(channel)
+            castVote_status = CastVote_stub.CastVote(Vote(
                 election_name='Election2',
                 choice_name ='number1',
                ))
@@ -136,8 +135,8 @@ def run():
                 print('-> Test "wrong group" success!')
                 logging.warning('The voter’s group is not allowed in the election')
 
-            CastVote_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
-            castVote_status = CastVote_stub.CastVote(inner_pb2.Vote(
+            CastVote_stub = eVotingReplicaStub(channel)
+            castVote_status = CastVote_stub.CastVote(Vote(
                 election_name='Election1',
                 choice_name ='number1',
                 ))
@@ -149,8 +148,8 @@ def run():
 
         try:
             print('\n【Test "GetResult" function】')
-            GetResult_stub = inner_pb2_grpc.eVotingReplicaStub(channel)
-            getResult = GetResult_stub.GetResult(inner_pb2.ElectionName(name='Election2'))
+            GetResult_stub = eVotingReplicaStub(channel)
+            getResult = GetResult_stub.GetResult(ElectionName(name='Election2'))
             if getResult.status:
                 logging.warning('Non-existent election or The election is still ongoing. Election result is not available yet')
             else:
@@ -158,12 +157,12 @@ def run():
                 for i in range(len(getResult.count)):
                     print('choice name [{}] : {}'.format(getResult.count[i].choice_name, getResult.count[i].count))
 
-            getResult = GetResult_stub.GetResult(inner_pb2.ElectionName(name='Election1'))
+            getResult = GetResult_stub.GetResult(ElectionName(name='Election1'))
             if getResult.status==1:
                 print('-> Test "Election result is not available yet" success!')
                 logging.warning('The election is still ongoing. Election result is not available yet')
             
-            getResult = GetResult_stub.GetResult(inner_pb2.ElectionName(name='Election3'))
+            getResult = GetResult_stub.GetResult(ElectionName(name='Election3'))
             if getResult.status==1:
                 print('-> Test "Non-existent election" success!')
                 logging.warning('Non-existent election ')
