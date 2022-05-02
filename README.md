@@ -74,4 +74,4 @@ python3 -m eVoter
 Ctrl-C to stop **primary**, and continue Vote.
 After cast the vote, then open **primary**.
 
-Check `election.json` and `result.json` in secondary and primary
+Check `election.json` and `result.json` in secondary and primary election data **should be same**.
