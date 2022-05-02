@@ -53,3 +53,25 @@ Check `election.json` and `result.json` in secondary and primary
   }
 ]
 ```
+
+## Crush Case
+```bash
+python3 -m dispatcher
+```
+
+```bash
+python3 -m primary
+```
+
+```bash
+python3 -m secondary
+```
+
+```bash
+python3 -m eVoter
+```
+
+Ctrl-C to stop **primary**, and continue Vote.
+After cast the vote, then open **primary**.
+
+Check `election.json` and `result.json` in secondary and primary
